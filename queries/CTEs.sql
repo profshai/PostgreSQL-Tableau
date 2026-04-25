@@ -62,22 +62,146 @@ FROM tas;
 
 
 ---------------------------------- MULTIPLE CTEs
+-- Finding records where happiness scores increased
+SELECT *
+FROM
+	(WITH hs23 AS (SELECT country, happiness_score FROM happiness_scores WHERE year= 2023),
+		  hs24 AS (SELECT country, ladder_score FROM happiness_scores_current)
+	SELECT hs23.country, 
+		   hs23.happiness_score AS hs2023, 
+		   hs24.ladder_score AS hs2024
+		FROM hs23 LEFT JOIN hs24
+			ON hs23.country = hs24.country) AS hs_23_24
+WHERE hs2023 < hs2024;
+
+
+-- Alternatively
+WITH 
+	hs23 AS (SELECT country, happiness_score FROM happiness_scores WHERE year= 2023),
+	hs24 AS (SELECT country, ladder_score FROM happiness_scores_current),
+	hs_23_24 AS (SELECT hs23.country, 
+		   				hs23.happiness_score AS hs2023, 
+		   				hs24.ladder_score AS hs2024
+				 FROM hs23 LEFT JOIN hs24
+						ON hs23.country = hs24.country)
+SELECT * 
+FROM hs_23_24
+WHERE hs2024 > hs2023;
 
 
 
+/* Using CTEs, can you provide a list of our factories, along with the names of the products
+they produce and the number of products they produce? */
+
+WITH 
+	fp AS (SELECT product_name, factory FROM products),
+	fn AS (SELECT factory, COUNT(product_id) AS num_products FROM products
+			GROUP BY factory)
+SELECT fp.product_name, fp.factory, fn.num_products
+FROM fp LEFT JOIN fn 
+		ON fp.factory = fn.factory
+ORDER BY fp.factory, fp.product_name
+;
+	
 
 
+/* ---------------------------------- RECURSIVE CTEs
+This is a query that references itself, which is useful for generating sequences 
+and working with hierarchical data.
+*/
+
+-- Return daily stock prices, including dates with missing prices
+-- Example 1: Generating sequences
+SELECT * FROM stock_prices;
+
+-- Generate a column of dates
+WITH RECURSIVE my_dates(dt) AS
+	(SELECT '2024-11-01'
+     UNION ALL
+     SELECT dt + INTERVAL 1 DAY
+     FROM my_dates
+     WHERE dt < '2024-11-06')
+     
+SELECT * FROM my_dates;
+
+-- Include the original prices
+WITH RECURSIVE my_dates(dt) AS
+	(SELECT '2024-11-01'
+     UNION ALL
+     SELECT dt + INTERVAL 1 DAY
+     FROM my_dates
+     WHERE dt < '2024-11-06')
+     
+SELECT	md.dt, sp.price
+FROM	my_dates md
+		LEFT JOIN stock_prices sp
+        ON md.dt = sp.date;
 
 
+-- Return the reporting chain for each employee
+-- Example 2: Working with hierachical data
+SELECT * FROM employees;
+
+-- Return the reporting chain for each employee
+WITH RECURSIVE employee_hierarchy AS (
+    SELECT	employee_id, employee_name, manager_id,
+			employee_name AS hierarchy
+    FROM	employees
+    WHERE	manager_id IS NULL
+    
+    UNION ALL
+    
+    SELECT	e.employee_id, e.employee_name, e.manager_id,
+			CONCAT(eh.hierarchy, ' > ', e.employee_name) AS hierarchy
+    FROM	employees e INNER JOIN employee_hierarchy eh
+			ON e.manager_id = eh.employee_id
+)
+
+SELECT	employee_id, employee_name,
+		manager_id, hierarchy
+FROM	employee_hierarchy
+ORDER BY employee_id;
 
 
+/* --------------- Subquery vs CTE vs Temp Table vs View -------------------------- 
+-- Both subqueries and CTEs only exist for the duration of the query. Require READ permissions only
+-- TEMPORARY tables only exist for a session.. They store data for a session. Requires CREATE permissions
+-- VIEWS continue to exist until modified or dropped. 
+A view is not a simple table (which stores table in memory indefinitely), 
+but view doesn't store a data at all, it saves a query and when you call the view, 
+it runs the query on a table. They are virtual tables based on a query. Requires CREATE permissions
+*/
+
+-- Subquery
+SELECT * FROM
+
+(SELECT	year, country, happiness_score FROM happiness_scores
+UNION ALL
+SELECT	2024, country, ladder_score FROM happiness_scores_current) AS my_subquery;
+
+-- CTE
+WITH my_cte AS (SELECT	year, country, happiness_score FROM happiness_scores
+				UNION ALL
+				SELECT	2024, country, ladder_score FROM happiness_scores_current)       
+SELECT * FROM my_cte;
 
 
+--------------------------------------- Temporary table
+CREATE TEMPORARY TABLE my_temp_table AS
+SELECT	year, country, happiness_score FROM happiness_scores
+UNION ALL
+SELECT	2024, country, ladder_score FROM happiness_scores_current;
+
+SELECT * FROM my_temp_table;
 
 
+---------------------------------------- View
+CREATE VIEW my_view AS
+SELECT	year, country, happiness_score FROM happiness_scores
+UNION ALL
+SELECT	2024, country, ladder_score FROM happiness_scores_current;
 
-
-
+SELECT * FROM my_view;
 
 
 
