@@ -1,10 +1,6 @@
-discard/
-raw data/
-sql-kansas-practice
+
 .DS_Store
 *.tar
 *.zip
-*.csv
 
 notes/
-data/
